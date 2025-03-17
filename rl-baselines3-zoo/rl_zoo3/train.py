@@ -194,9 +194,9 @@ def train() -> None:
         th.set_num_threads(args.num_threads)
 
     if args.trained_agent != "":
-        assert args.trained_agent.endswith(".zip") and os.path.isfile(
-            args.trained_agent
-        ), "The trained_agent must be a valid path to a .zip file"
+        assert args.trained_agent.endswith(".zip") and os.path.isfile(args.trained_agent), (
+            "The trained_agent must be a valid path to a .zip file"
+        )
 
     print("=" * 10, env_id, "=" * 10)
     print(f"Seed: {args.seed}")

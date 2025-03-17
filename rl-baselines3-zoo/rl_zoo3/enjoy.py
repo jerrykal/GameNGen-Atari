@@ -38,8 +38,7 @@ def enjoy() -> None:  # noqa: C901
     parser.add_argument(
         "--load-checkpoint",
         type=int,
-        help="Load checkpoint instead of last model if available, "
-        "you must pass the number of timesteps corresponding to it",
+        help="Load checkpoint instead of last model if available, you must pass the number of timesteps corresponding to it",
     )
     parser.add_argument(
         "--load-last-checkpoint",

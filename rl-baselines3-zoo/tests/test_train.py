@@ -99,8 +99,7 @@ def test_custom_yaml(tmp_path):
 def test_python_config_file(tmp_path, config_file):
     # Use the example python config file for training
     cmd = (
-        f"python train.py -n {N_STEPS} --algo ppo --env MountainCarContinuous-v0 --log-folder {tmp_path} "
-        f"-conf {config_file} "
+        f"python train.py -n {N_STEPS} --algo ppo --env MountainCarContinuous-v0 --log-folder {tmp_path} -conf {config_file} "
     )
     return_code = subprocess.call(shlex.split(cmd))
     _assert_eq(return_code, 0)

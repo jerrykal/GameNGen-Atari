@@ -182,9 +182,9 @@ def all_plots():  # noqa: C901
                     if args.median:
                         results[env][f"{algo}-{args.labels[folder_idx]}"] = f"{np.median(last_evals):.0f}"
                     else:
-                        results[env][
-                            f"{algo}-{args.labels[folder_idx]}"
-                        ] = f"{np.mean(last_evals):.0f} +/- {std_error_last_eval:.0f}"
+                        results[env][f"{algo}-{args.labels[folder_idx]}"] = (
+                            f"{np.mean(last_evals):.0f} +/- {std_error_last_eval:.0f}"
+                        )
 
                     # x axis in Millions of timesteps
                     divider = 1e6
@@ -229,7 +229,7 @@ def all_plots():  # noqa: C901
         for algo in args.algos:
             for label in args.labels:
                 key = f"{algo}-{label}"
-                value_matrix[i].append(f'{results[env].get(key, "0.0 +/- 0.0")}')
+                value_matrix[i].append(f"{results[env].get(key, '0.0 +/- 0.0')}")
 
     writer.value_matrix = value_matrix
     writer.write_table()

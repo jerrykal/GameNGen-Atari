@@ -119,11 +119,7 @@ def test_record_training(tmp_path):
     return_code = subprocess.call(shlex.split(cmd))
     _assert_eq(return_code, 0)
 
-    cmd = (
-        f"python -m rl_zoo3.record_training -n 100 --algo {algo} --env {env_id} "
-        f"--f {tmp_path} "
-        f"--gif -o {videos_tmp_path}"
-    )
+    cmd = f"python -m rl_zoo3.record_training -n 100 --algo {algo} --env {env_id} --f {tmp_path} --gif -o {videos_tmp_path}"
     return_code = subprocess.call(shlex.split(cmd))
     _assert_eq(return_code, 0)
 

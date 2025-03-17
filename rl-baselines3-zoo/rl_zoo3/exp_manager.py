@@ -477,9 +477,9 @@ class ExperimentManager:
             noise_std = hyperparams["noise_std"]
 
             # Save for later (hyperparameter optimization)
-            assert isinstance(
-                env.action_space, spaces.Box
-            ), f"Action noise can only be used with Box action space, not {env.action_space}"
+            assert isinstance(env.action_space, spaces.Box), (
+                f"Action noise can only be used with Box action space, not {env.action_space}"
+            )
             self.n_actions = env.action_space.shape[0]
 
             if "normal" in noise_type:
@@ -710,9 +710,9 @@ class ExperimentManager:
         if os.path.exists(replay_buffer_path):
             print("Loading replay buffer")
             # `truncate_last_traj` will be taken into account only if we use HER replay buffer
-            assert hasattr(
-                model, "load_replay_buffer"
-            ), "The current model doesn't have a `load_replay_buffer` to load the replay buffer"
+            assert hasattr(model, "load_replay_buffer"), (
+                "The current model doesn't have a `load_replay_buffer` to load the replay buffer"
+            )
             model.load_replay_buffer(replay_buffer_path, truncate_last_traj=self.truncate_last_trajectory)
         return model
 
@@ -905,8 +905,7 @@ class ExperimentManager:
             print(f"    {key}: {value}")
 
         report_name = (
-            f"report_{self.env_name}_{self.n_trials}-trials-{self.n_timesteps}"
-            f"-{self.sampler}-{self.pruner}_{int(time.time())}"
+            f"report_{self.env_name}_{self.n_trials}-trials-{self.n_timesteps}-{self.sampler}-{self.pruner}_{int(time.time())}"
         )
 
         log_path = os.path.join(self.log_folder, self.algo, report_name)
