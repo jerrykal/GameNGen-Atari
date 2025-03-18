@@ -162,6 +162,15 @@ def train() -> None:
         "-tags", "--wandb-tags", type=str, default=[], nargs="+", help="Tags for wandb run, e.g.: -tags optimized pr-123"
     )
 
+    parser.add_argument(
+        "--data-collect-dir",
+        type=str,
+        default=None,
+        help="""\
+Directory where the gameplay data collected from the agent during training will be saved, used for training the
+ GameNGen diffusion model""",
+    )
+
     args = parser.parse_args()
 
     # Going through custom gym packages to let them register in the global registry
@@ -260,6 +269,7 @@ def train() -> None:
         device=args.device,
         config=args.conf_file,
         show_progress=args.progress,
+        data_collect_dir=args.data_collect_dir,
     )
 
     # Prepare experiment and launch hyperparameter optimization if needed

@@ -49,6 +49,7 @@ from torch import nn as nn
 # Register custom envs
 import rl_zoo3.import_envs  # noqa: F401
 from rl_zoo3.callbacks import SaveVecNormalizeCallback, TrialEvalCallback
+from rl_zoo3.data_collect.env_utils import make_data_collect_vec_env
 from rl_zoo3.hyperparams_opt import HYPERPARAMS_SAMPLER
 from rl_zoo3.utils import ALGOS, get_callback_list, get_class_by_name, get_latest_run_id, get_wrapper_class, linear_schedule
 
@@ -102,6 +103,7 @@ class ExperimentManager:
         device: Union[th.device, str] = "auto",
         config: Optional[str] = None,
         show_progress: bool = False,
+        data_collect_dir: Optional[str] = None,
     ):
         super().__init__()
         self.algo = algo
@@ -186,6 +188,17 @@ class ExperimentManager:
             self.log_path, f"{self.env_name}_{get_latest_run_id(self.log_path, self.env_name) + 1}{uuid_str}"
         )
         self.params_path = f"{self.save_path}/{self.env_name}"
+
+        # Data collect
+        self.data_collect_dir = (
+            os.path.join(
+                data_collect_dir,
+                f"{self.algo}",
+                f"{self.env_name}_{get_latest_run_id(self.log_path, self.env_name) + 1}{uuid_str}",
+            )
+            if data_collect_dir is not None
+            else None
+        )
 
     def setup_experiment(self) -> Optional[tuple[BaseAlgorithm, dict[str, Any]]]:
         """
@@ -636,19 +649,33 @@ class ExperimentManager:
 
         env_kwargs = self.eval_env_kwargs if eval_env else self.env_kwargs
 
-        # On most env, SubprocVecEnv does not help and is quite memory hungry,
-        # therefore, we use DummyVecEnv by default
-        env = make_vec_env(
-            make_env,
-            n_envs=n_envs,
-            seed=self.seed,
-            env_kwargs=env_kwargs,
-            monitor_dir=log_dir,
-            wrapper_class=self.env_wrapper,
-            vec_env_cls=self.vec_env_class,  # type: ignore[arg-type]
-            vec_env_kwargs=self.vec_env_kwargs,
-            monitor_kwargs=self.monitor_kwargs,
-        )
+        if self.data_collect_dir is not None:
+            env = make_data_collect_vec_env(
+                make_env,
+                n_envs=n_envs,
+                seed=self.seed,
+                env_kwargs=env_kwargs,
+                data_collect_dir=self.data_collect_dir,
+                monitor_dir=log_dir,
+                wrapper_class=self.env_wrapper,
+                vec_env_cls=self.vec_env_class,  # type: ignore[arg-type]
+                vec_env_kwargs=self.vec_env_kwargs,
+                monitor_kwargs=self.monitor_kwargs,
+            )
+        else:
+            # On most env, SubprocVecEnv does not help and is quite memory hungry,
+            # therefore, we use DummyVecEnv by default
+            env = make_vec_env(
+                make_env,
+                n_envs=n_envs,
+                seed=self.seed,
+                env_kwargs=env_kwargs,
+                monitor_dir=log_dir,
+                wrapper_class=self.env_wrapper,
+                vec_env_cls=self.vec_env_class,  # type: ignore[arg-type]
+                vec_env_kwargs=self.vec_env_kwargs,
+                monitor_kwargs=self.monitor_kwargs,
+            )
 
         if self.vec_env_wrapper is not None:
             env = self.vec_env_wrapper(env)
