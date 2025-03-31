@@ -1,3 +1,5 @@
 stable_baselines3[extra]
 pyarrow
 imageio
+diffusers[torch]
+transformers
