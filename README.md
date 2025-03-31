@@ -5,6 +5,5 @@ An unofficial implementation of GameNGen simulating various classic Atari games 
 ## Setup
 
 ```bash
-pip install -e rl-baselines3-zoo
 pip install -r requirements.txt
 ```
