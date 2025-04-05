@@ -1,9 +1,7 @@
 import io
 import os
-import pickle
 
 import gymnasium as gym
-import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -26,16 +24,9 @@ class DataCollectWrapper(gym.Wrapper):
     def _init_episode_data(self) -> None:
         self.episode_data = {
             "episode_id": self.episode_id,
-            "serialized_frames": [],
+            "frames": [],
             "actions": [],
         }
-
-    def _compress_image(self, image_array: np.ndarray, format="JPEG", quality=85):
-        """Compress image using PIL with JPEG compression"""
-        img = Image.fromarray(image_array)
-        buffer = io.BytesIO()
-        img.save(buffer, format=format, quality=quality)
-        return buffer.getvalue()
 
     def _dump_episode_data(self) -> None:
         """Save the episode data to a parquet file"""
@@ -47,9 +38,12 @@ class DataCollectWrapper(gym.Wrapper):
 
     def step(self, action: int) -> GymStepReturn:
         """Collect frame and action data during the episode"""
-        frame = self.render()
-        self.episode_data["serialized_frames"].append(pickle.dumps(frame))
+        frame = Image.fromarray(self.render())
+        buffer = io.BytesIO()
+        frame.save(buffer, format="PNG")
+        self.episode_data["frames"].append(buffer.getvalue())
         self.episode_data["actions"].append(action)
+
         observation, reward, terminated, truncated, info = self.env.step(action)
         if terminated or truncated:
             self._dump_episode_data()
