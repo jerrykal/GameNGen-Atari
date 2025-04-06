@@ -65,11 +65,8 @@ def make_data_collect_vec_env(
             env = Monitor(env, filename=monitor_path, **monitor_kwargs)
 
             # Wrap the env in a DataCollectWrapper to collect (frame, action) pair data
-            data_collect_path = os.path.join(data_collect_dir, str(rank)) if data_collect_dir is not None else None
-            # Create the data save folder if needed
-            if data_collect_path is not None and data_collect_dir is not None:
-                os.makedirs(data_collect_dir, exist_ok=True)
-            env = DataCollectWrapper(env, output_dir=data_collect_path)
+            if data_collect_dir is not None:
+                env = DataCollectWrapper(env, rank=rank, output_dir=data_collect_dir)
 
             # Optionally, wrap the environment with the provided wrapper
             if wrapper_class is not None:
