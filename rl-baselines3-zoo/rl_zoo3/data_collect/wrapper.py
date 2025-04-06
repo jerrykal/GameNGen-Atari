@@ -51,9 +51,10 @@ class DataCollectWrapper(gym.Wrapper):
         self.episode_data["step_id"].append(self.step_id)
 
         observation, reward, terminated, truncated, info = self.env.step(action)
+        self.step_id += 1
+
         if terminated or truncated:
             self._dump_episode_data()
             self._reset_episode_data()
-        self.step_id += 1
 
         return observation, reward, terminated, truncated, info
