@@ -3,7 +3,9 @@ import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from datasets import load_dataset, load_from_disk
+import datasets
+import torch
+from datasets import DatasetDict, load_dataset, load_from_disk
 from datasets.splits import Split
 from PIL import Image
 from torch.utils.data import Dataset
@@ -25,17 +27,22 @@ class GameplayDataset(Dataset):
         name: str | None = None,
         data_dir: str | Sequence[str] | Mapping[str, str | Sequence[str]] | None = None,
         data_files: str | None = None,
-        split: str | Split | None = None,
+        split: str | Split = "train",
         context_length: int = 16,
         **load_dataset_kwargs,
     ) -> None:
         self.context_length = context_length
 
-        if os.path.exists(os.path.join(path, "dataset_info.json")):
+        assert split is not None, "Dataset split must be specified"
+        if os.path.exists(os.path.join(path, "dataset_info.json")) or os.path.exists(
+            os.path.join(path, "dataset_dict.json")
+        ):
             # Load the dataset from disk if it exists
-            self.dataset = load_from_disk(path)
+            self.dataset: datasets.Dataset = load_from_disk(path)
+            if isinstance(self.dataset, DatasetDict):
+                self.dataset = self.dataset[split]
         else:
-            self.dataset = load_dataset(
+            self.dataset: datasets.Dataset = load_dataset(
                 path=path,
                 name=name,
                 data_dir=data_dir,
@@ -64,11 +71,14 @@ class GameplayDataset(Dataset):
         return self._action_dim
 
     def _transform(self, example: dict[str, Any]) -> dict[str, Any]:
-        example["frame"] = [
-            self._frame_transform(Image.open(io.BytesIO(frame)))
-            for frame in example["frame"]
-        ]
-        return example
+        frames = torch.stack(
+            [
+                self._frame_transform(Image.open(io.BytesIO(frame)))
+                for frame in example["frame"]
+            ]
+        )
+        actions = torch.tensor(example["action"]).unsqueeze(1)
+        return {"pixel_values": frames, "input_ids": actions}
 
     def __len__(self) -> int:
         return len(self.dataset)
