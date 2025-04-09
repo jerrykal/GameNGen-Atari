@@ -77,8 +77,8 @@ class GameplayDataset(Dataset):
         if idx < self.context_length:
             # Pad the beginning of the sequence with the first example until the context length is reached
             return {
-                key: [self.dataset[0][key]] * (self.context_length - idx - 1)
+                key: [self.dataset[0][key]] * (self.context_length - idx)
                 + self.dataset[: idx + 1][key]
                 for key in self.dataset[0].keys()
             }
-        return self.dataset[idx - self.context_length + 1 : idx + 1]
+        return self.dataset[idx - self.context_length : idx + 1]
