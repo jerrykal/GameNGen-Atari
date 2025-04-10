@@ -1,16 +1,28 @@
 import os
 
 import accelerate
+import torch
 from accelerate.state import AcceleratorState
 from diffusers import (
     AutoencoderKL,
     DDIMScheduler,
     UNet2DConditionModel,
 )
+from diffusers.configuration_utils import ConfigMixin, register_to_config
+from diffusers.loaders import FromOriginalModelMixin
+from diffusers.models.modeling_utils import ModelMixin
 from torch import nn
 from transformers.utils import ContextManagers
 
-from .model import ActionEmbeddingModel
+
+class ActionEmbeddingModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
+    @register_to_config
+    def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
+        super().__init__()
+        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
+
+    def forward(self, action_ids: torch.Tensor) -> torch.Tensor:
+        return self.embedding(action_ids)
 
 
 def get_models(
@@ -95,10 +107,11 @@ def get_models(
         )
 
         # Add class_embedding for noise augmentation
-        unet.register_to_config(num_class_embeds=num_noise_buckets)
-        unet.class_embedding = nn.Embedding(
-            num_noise_buckets, unet.time_embedding.linear_2.out_features
-        )
+        if num_noise_buckets > 0:
+            unet.register_to_config(num_class_embeds=num_noise_buckets)
+            unet.class_embedding = nn.Embedding(
+                num_noise_buckets, unet.time_embedding.linear_2.out_features
+            )
 
     # Freeze vae and make unet and action_embedding trainable
     vae.requires_grad_(False)
