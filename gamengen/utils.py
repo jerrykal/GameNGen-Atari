@@ -23,10 +23,10 @@ def get_models(
     variant: str | None = None,
 ) -> tuple[UNet2DConditionModel, AutoencoderKL, DDIMScheduler, ActionEmbeddingModel]:
     # Use DDIM scheduler and v-prediction following the GameNGen paper
-    scheduler = DDIMScheduler.from_pretrained(
+    noise_scheduler = DDIMScheduler.from_pretrained(
         pretrained_model_name_or_path, subfolder="scheduler"
     )
-    scheduler.register_to_config(prediction_type="v_prediction")
+    noise_scheduler.register_to_config(prediction_type="v_prediction")
 
     def deepspeed_zero_init_disabled_context_manager():
         """
@@ -105,17 +105,17 @@ def get_models(
     unet.train()
     action_embedding.train()
 
-    return unet, vae, scheduler, action_embedding
+    return unet, vae, noise_scheduler, action_embedding
 
 
 def save_models(
     unet: UNet2DConditionModel,
     vae: AutoencoderKL,
-    scheduler: DDIMScheduler,
+    noise_scheduler: DDIMScheduler,
     action_embedding: ActionEmbeddingModel,
     output_dir: str,
 ) -> None:
     unet.save_pretrained(os.path.join(output_dir, "unet"))
     vae.save_pretrained(os.path.join(output_dir, "vae"))
-    scheduler.save_pretrained(os.path.join(output_dir, "scheduler"))
+    noise_scheduler.save_pretrained(os.path.join(output_dir, "scheduler"))
     action_embedding.save_pretrained(os.path.join(output_dir, "action_embedding"))
