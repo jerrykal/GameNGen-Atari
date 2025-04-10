@@ -77,7 +77,7 @@ class GameplayDataset(Dataset):
                 for frame in example["frame"]
             ]
         )
-        actions = torch.tensor(example["action"]).unsqueeze(1)
+        actions = torch.tensor(example["action"])
         return {"pixel_values": frames, "input_ids": actions}
 
     def __len__(self) -> int:
