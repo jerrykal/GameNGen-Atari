@@ -481,7 +481,14 @@ def main():
         def save_model_hook(models, weights, output_dir):
             if accelerator.is_main_process:
                 for _, model in enumerate(models):
-                    model.save_pretrained(os.path.join(output_dir, "unet"))
+                    if isinstance(model, UNet2DConditionModel):
+                        model.save_pretrained(os.path.join(output_dir, "unet"))
+                    elif isinstance(model, ActionEmbeddingModel):
+                        model.save_pretrained(
+                            os.path.join(output_dir, "action_embedding")
+                        )
+                    else:
+                        raise ValueError(f"Unknown model type: {type(model)}")
 
                     # make sure to pop weight so that corresponding model is not saved again
                     weights.pop()
@@ -491,10 +498,17 @@ def main():
                 # pop models so that they are not loaded again
                 model = models.pop()
 
-                # load diffusers style into model
-                load_model = UNet2DConditionModel.from_pretrained(
-                    input_dir, subfolder="unet"
-                )
+                if isinstance(model, UNet2DConditionModel):
+                    load_model = UNet2DConditionModel.from_pretrained(
+                        input_dir, subfolder="unet"
+                    )
+                elif isinstance(model, ActionEmbeddingModel):
+                    load_model = ActionEmbeddingModel.from_pretrained(
+                        input_dir, subfolder="action_embedding"
+                    )
+                else:
+                    raise ValueError(f"Unknown model type: {type(model)}")
+
                 model.register_to_config(**load_model.config)
 
                 model.load_state_dict(load_model.state_dict())
