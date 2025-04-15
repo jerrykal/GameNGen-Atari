@@ -49,7 +49,8 @@ from packaging import version
 from tqdm.auto import tqdm
 
 from .dataset import GameplayDataset
-from .models import get_models, save_models
+from .models import ActionEmbeddingModel, get_models
+from .pipeline import GameNGenPipeline
 
 if is_wandb_available():
     pass
@@ -881,7 +882,16 @@ def main():
     if accelerator.is_main_process:
         unet = unwrap_model(unet)
         action_embedding = unwrap_model(action_embedding)
-        save_models(unet, vae, noise_scheduler, action_embedding, args.output_dir)
+
+        pipeline = GameNGenPipeline.from_pretrained(
+            args.pretrained_model_name_or_path,
+            vae=vae,
+            unet=unet,
+            action_embedding=action_embedding,
+            revision=args.revision,
+            variant=args.variant,
+        )
+        pipeline.save_pretrained(args.output_dir)
 
     accelerator.end_training()
 
