@@ -37,7 +37,7 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from diffusers import (
     UNet2DConditionModel,
 )
-from diffusers.models import AutoencoderKL, UNet2DConditionModel
+from diffusers.models import AutoencoderKL
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import (
     compute_dream_and_update_latents,
@@ -51,8 +51,6 @@ from diffusers.utils.torch_utils import is_compiled_module
 from einops import rearrange
 from packaging import version
 from tqdm.auto import tqdm
-
-from gamengen.models import ActionEmbeddingModel
 
 from .dataset import GameplayDataset
 from .models import ActionEmbeddingModel, get_models
