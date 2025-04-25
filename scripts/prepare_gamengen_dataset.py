@@ -62,23 +62,30 @@ def main() -> None:
         data_files=data_files,
         split="train",
     )
-    dataset = dataset.train_test_split(
-        train_size=args.train_size,
-        shuffle=False,
-    )
+    if args.train_size < 1.0:
+        dataset = dataset.train_test_split(
+            train_size=args.train_size,
+            shuffle=False,
+        )
 
-    # The trajectory from the last episode in the train set could be split between the train and test sets.
-    # Therefore, we move it from the test set to the train set.
-    episode_end = dataset["test"]["step_id"].index(0)
-    dataset["train"] = concatenate_datasets(
-        [dataset["train"], dataset["test"].select(range(episode_end))]
-    )
-    dataset["test"] = dataset["test"].select(range(episode_end, len(dataset["test"])))
+        # The trajectory from the last episode in the train set could be split between the train and test sets.
+        # Therefore, we move it from the test set to the train set.
+        episode_end = dataset["test"]["step_id"].index(0)
+        dataset["train"] = concatenate_datasets(
+            [dataset["train"], dataset["test"].select(range(episode_end))]
+        )
+        dataset["test"] = dataset["test"].select(
+            range(episode_end, len(dataset["test"]))
+        )
 
-    print(f"Number of examples in train split: {len(dataset['train'])}")
-    print(f"Number of examples in test split: {len(dataset['test'])}")
-    print(f"Saving dataset to {args.output_dir}")
-    dataset.save_to_disk(args.output_dir)
+        print(f"Number of examples in train split: {len(dataset['train'])}")
+        print(f"Number of examples in test split: {len(dataset['test'])}")
+        print(f"Saving dataset to {args.output_dir}")
+        dataset.save_to_disk(args.output_dir)
+    else:
+        print(f"Total number of examples: {len(dataset)}")
+        print(f"Saving dataset to {args.output_dir}")
+        dataset.save_to_disk(args.output_dir)
 
 
 if __name__ == "__main__":
