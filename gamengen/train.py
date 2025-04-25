@@ -20,20 +20,24 @@ import math
 import os
 import random
 import shutil
+from contextlib import nullcontext
 
 import accelerate
 import datasets
 import diffusers
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
+import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from diffusers import (
     UNet2DConditionModel,
 )
+from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import (
     compute_dream_and_update_latents,
@@ -48,6 +52,8 @@ from einops import rearrange
 from packaging import version
 from tqdm.auto import tqdm
 
+from gamengen.models import ActionEmbeddingModel
+
 from .dataset import GameplayDataset
 from .models import ActionEmbeddingModel, get_models
 from .pipeline import GameNGenPipeline
@@ -57,6 +63,104 @@ if is_wandb_available():
 
 
 logger = get_logger(__name__, log_level="INFO")
+
+
+def log_validation(
+    batch: dict[str, torch.tensor],
+    vae: AutoencoderKL,
+    unet: UNet2DConditionModel,
+    action_embedding: ActionEmbeddingModel,
+    args: argparse.Namespace,
+    accelerator: Accelerator,
+    weight_dtype: torch.dtype,
+    global_step: int,
+) -> None:
+    logger.info("Running validation... ")
+    pipeline = GameNGenPipeline.from_pretrained(
+        args.pretrained_model_name_or_path,
+        vae=accelerator.unwrap_model(vae),
+        unet=accelerator.unwrap_model(unet),
+        action_embedding=accelerator.unwrap_model(action_embedding),
+        revision=args.revision,
+        variant=args.variant,
+        torch_dtype=weight_dtype,
+    )
+
+    pipeline = pipeline.to(accelerator.device)
+    pipeline.set_progress_bar_config(disable=True)
+
+    if args.enable_xformers_memory_efficient_attention:
+        pipeline.enable_xformers_memory_efficient_attention()
+
+    if args.seed is None:
+        generator = None
+    else:
+        generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
+
+    generated_images = []
+    target_images = []
+    for i in range(batch["pixel_values"].shape[0]):
+        if torch.backends.mps.is_available():
+            autocast_ctx = nullcontext()
+        else:
+            autocast_ctx = torch.autocast(accelerator.device.type)
+
+        with autocast_ctx:
+            past_frames = (
+                batch["pixel_values"][i][:-1, ...].unsqueeze(0).to(accelerator.device)
+            )
+            past_actions = (
+                batch["input_ids"][i][:-1, ...].unsqueeze(0).to(accelerator.device)
+            )
+            generated_image = pipeline(
+                past_frames,
+                past_actions,
+                num_inference_steps=args.validation_num_inference_steps,
+                generator=generator,
+            ).images[0]
+
+            target_image = batch["pixel_values"][i][-1, ...].unsqueeze(0)
+            target_image = pipeline.image_processor.postprocess(
+                target_image,
+                output_type="pil",
+                do_denormalize=[True] * target_image.shape[0],
+            )[0]
+
+        generated_images.append(generated_image)
+        target_images.append(target_image)
+
+    for tracker in accelerator.trackers:
+        if tracker.name == "tensorboard":
+            concatenated_images = np.stack(
+                [
+                    np.concatenate((np.asarray(gen_img), np.asarray(tar_img)), axis=1)
+                    for gen_img, tar_img in zip(generated_images, target_images)
+                ]
+            )
+            tracker.writer.add_images(
+                "generated_images vs target_images",
+                concatenated_images,
+                global_step,
+                dataformats="NHWC",
+            )
+        elif tracker.name == "wandb":
+            tracker.log(
+                {
+                    "generated_images": [
+                        wandb.Image(image, caption=f"Generated Image {i}")
+                        for i, image in enumerate(generated_images)
+                    ],
+                    "target_images": [
+                        wandb.Image(image, caption=f"Target Image {i}")
+                        for i, image in enumerate(target_images)
+                    ],
+                }
+            )
+        else:
+            logger.warning(f"image logging not implemented for {tracker.name}")
+
+    del pipeline
+    torch.cuda.empty_cache()
 
 
 def parse_args():
@@ -333,10 +437,10 @@ def parse_args():
         "--noise_offset", type=float, default=0, help="The scale of noise offset."
     )
     parser.add_argument(
-        "--validation_epochs",
+        "--validation_steps",
         type=int,
-        default=5,
-        help="Run validation every X epochs.",
+        default=100,
+        help="Run validation every X steps.",
     )
     parser.add_argument(
         "--tracker_project_name",
@@ -346,6 +450,12 @@ def parse_args():
             "The `project_name` argument passed to Accelerator.init_trackers for"
             " more information see https://huggingface.co/docs/accelerate/v0.17.0/en/package_reference/accelerator#accelerate.Accelerator"
         ),
+    )
+    parser.add_argument(
+        "--validation_num_inference_steps",
+        type=int,
+        default=10,
+        help="Number of inference steps to use for validation.",
     )
 
     # GameNGen specific arguments
@@ -830,6 +940,23 @@ def main():
                 accelerator.log({"train_loss": train_loss}, step=global_step)
                 train_loss = 0.0
 
+                if accelerator.is_main_process:
+                    if global_step % args.validation_steps == 0:
+                        # Use the first two examples from current batch for validation
+                        validation_batch = {
+                            key: value[:2] for key, value in batch.items()
+                        }
+                        log_validation(
+                            validation_batch,
+                            vae,
+                            unet,
+                            action_embedding,
+                            args,
+                            accelerator,
+                            weight_dtype,
+                            global_step,
+                        )
+
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
                         # _before_ saving state, check if this save would set us over the `checkpoints_total_limit`
@@ -887,6 +1014,7 @@ def main():
             args.pretrained_model_name_or_path,
             vae=vae,
             unet=unet,
+            scheduler=noise_scheduler,
             action_embedding=action_embedding,
             revision=args.revision,
             variant=args.variant,

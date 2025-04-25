@@ -79,6 +79,7 @@ class GameNGenPipeline(DiffusionPipeline):
         past_actions: torch.Tensor,
         num_inference_steps: int = 4,
         guidance_scale: float = 1.5,
+        generator: torch.Generator | None = None,
         output_type: str = "pil",
         return_dict: bool = True,
     ) -> ImagePipelineOutput | tuple:
@@ -116,6 +117,7 @@ class GameNGenPipeline(DiffusionPipeline):
             width,
             context_latents.dtype,
             device,
+            generator,
         )
         latents = torch.cat([context_latents, latents], dim=1)
 
@@ -124,7 +126,7 @@ class GameNGenPipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 if self.do_classifier_free_guidance:
                     uncond_latents = latents.clone()
-                    uncond_latents[:, :num_past_frames, ...].zero_()
+                    uncond_latents[:, :num_past_frames].zero_()
 
                     latent_model_input = torch.cat([uncond_latents, latents])
                 else:
@@ -156,16 +158,16 @@ class GameNGenPipeline(DiffusionPipeline):
                     )
 
                 # Denoise the last frame which is the next frame to be generated
-                next_frame_latent = latents[:, -1, :, :, :]
-                next_frame_latent = self.scheduler.step(
+                next_frame_latent = latents[:, -1]
+                denoised_next_frame_latent = self.scheduler.step(
                     noise_pred, t, next_frame_latent, return_dict=False
                 )[0]
-                latents[:, -1, :, :, :] = next_frame_latent
+                latents[:, -1] = denoised_next_frame_latent
 
                 progress_bar.update()
 
         # 6. Decode and postprocess the latents
-        new_frame_latent = latents[:, -1, :, :, :]
+        new_frame_latent = latents[:, -1]
         if not output_type == "latent":
             image = self.vae.decode(
                 new_frame_latent / self.vae.config.scaling_factor, return_dict=False
