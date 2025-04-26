@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 
-output_dir=${OUTPUT_DIR:-"saves/gamengen_pong_$(date +%Y%m%d_%H%M)"}
 dataset_name=${DATASET_NAME:-"data/gamengen/pong"}
 seed=${SEED:-42}
 max_train_steps=${MAX_TRAIN_STEPS:-700000}
 learning_rate=${LEARNING_RATE:-2e-5}
-context_length=${CONTEXT_LENGTH:-64}
+context_length=${CONTEXT_LENGTH:-4}
 
 total_batch_size=${TOTAL_BATCH_SIZE:-16}
-batch_size_per_device=${BATCH_SIZE_PER_DEVICE:-2}
+batch_size_per_device=${BATCH_SIZE_PER_DEVICE:-16}
 gradient_accumulation_steps=$((total_batch_size / batch_size_per_device))
+checkpoints_total_limit=${CHECKPOINTS_TOTAL_LIMIT:-2}
+checkpointing_steps=${CHECKPOINTING_STEPS:-100}
+
+name_suffix="cl${context_length}_bsz${total_batch_size}_$(date +%Y%m%d_%H%M)"
+additional_suffix="${ADDITIONAL_SUFFIX:-}"
+output_dir=${OUTPUT_DIR:-"saves/gamengen/pong_${name_suffix}${additional_suffix}"}
 
 args=(
     --output_dir="$output_dir"
@@ -21,7 +26,9 @@ args=(
     --learning_rate="$learning_rate"
     --train_batch_size="$batch_size_per_device"
     --gradient_accumulation_steps="$gradient_accumulation_steps"
-    --checkpoints_total_limit=2
+    --checkpoints_total_limit="$checkpoints_total_limit"
+    --checkpointing_steps="$checkpointing_steps"
+    --resume_from_checkpoint="latest"
     "$@"
 )
 
