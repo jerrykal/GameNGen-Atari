@@ -164,7 +164,7 @@ def log_validation(
     torch.cuda.empty_cache()
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Training script for GameNGen diffusion pipeline."
     )
@@ -529,7 +529,7 @@ def parse_args():
     return args
 
 
-def train():
+def train() -> None:
     args = parse_args()
 
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
