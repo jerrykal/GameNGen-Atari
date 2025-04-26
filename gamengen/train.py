@@ -166,12 +166,6 @@ def parse_args():
         description="Training script for GameNGen diffusion pipeline."
     )
     parser.add_argument(
-        "--input_perturbation",
-        type=float,
-        default=0,
-        help="The scale of input perturbation. Recommended 0.1.",
-    )
-    parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
         default="CompVis/stable-diffusion-v1-4",
@@ -825,10 +819,6 @@ def main():
                         (latents.shape[0], 1, latents.shape[2], 1, 1),
                         device=latents.device,
                     )
-                if args.input_perturbation:
-                    new_noise = noise + args.input_perturbation * torch.randn_like(
-                        noise
-                    )
 
                 bsz = latents.shape[0]
                 # Sample a random timestep for each image
@@ -842,12 +832,10 @@ def main():
 
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
-                if args.input_perturbation:
-                    noisy_latents = noise_scheduler.add_noise(
-                        latents, new_noise, timesteps
-                    )
-                else:
-                    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                noisy_latents = latents.clone()
+                noisy_latents[:, -1:] = noise_scheduler.add_noise(
+                    latents[:, -1:], noise, timesteps
+                )
 
                 # Reshape the noisy_latents so that context_frames are concatenated at the latent channels
                 noisy_latents = rearrange(noisy_latents, "b l c h w -> b (l c) h w")
@@ -874,7 +862,7 @@ def main():
                     )
 
                 # Set last frame as target
-                target = target[:, -1, :, :, :]
+                target = target[:, -1]
 
                 if args.dream_training:
                     noisy_latents, target = compute_dream_and_update_latents(
