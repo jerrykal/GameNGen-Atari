@@ -766,7 +766,7 @@ def train() -> None:
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         vae = unwrap_model(vae)
-        vae.save_pretrained(args.output_dir, subfolder="vae")
+        vae.save_pretrained(os.path.join(args.output_dir, "vae"))
 
     accelerator.end_training()
 
