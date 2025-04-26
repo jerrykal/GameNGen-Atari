@@ -529,7 +529,7 @@ def parse_args():
     return args
 
 
-def main():
+def train():
     args = parse_args()
 
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
@@ -1053,4 +1053,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    train()
