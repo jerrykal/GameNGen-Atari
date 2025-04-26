@@ -30,14 +30,14 @@ import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
-import wandb
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from diffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
     UNet2DConditionModel,
 )
-from diffusers.models import AutoencoderKL
 from diffusers.optimization import get_scheduler
 from diffusers.training_utils import (
     compute_dream_and_update_latents,
@@ -57,7 +57,7 @@ from .models import ActionEmbeddingModel, get_models
 from .pipeline import GameNGenPipeline
 
 if is_wandb_available():
-    pass
+    import wandb
 
 
 logger = get_logger(__name__, log_level="INFO")
@@ -67,6 +67,7 @@ def log_validation(
     batch: dict[str, torch.tensor],
     vae: AutoencoderKL,
     unet: UNet2DConditionModel,
+    noise_scheduler: DDIMScheduler,
     action_embedding: ActionEmbeddingModel,
     args: argparse.Namespace,
     accelerator: Accelerator,
@@ -78,6 +79,7 @@ def log_validation(
         args.pretrained_model_name_or_path,
         vae=accelerator.unwrap_model(vae),
         unet=accelerator.unwrap_model(unet),
+        scheduler=noise_scheduler,
         action_embedding=accelerator.unwrap_model(action_embedding),
         revision=args.revision,
         variant=args.variant,
@@ -214,15 +216,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--max_train_samples",
-        type=int,
-        default=None,
-        help=(
-            "For debugging purposes or quicker training, truncate the number of training examples to this "
-            "value if set."
-        ),
-    )
-    parser.add_argument(
         "--output_dir",
         type=str,
         required=True,
@@ -243,11 +236,11 @@ def parse_args() -> argparse.Namespace:
         default=16,
         help="Batch size (per device) for the training dataloader.",
     )
-    parser.add_argument("--num_train_epochs", type=int, default=None)
+    parser.add_argument("--num_train_epochs", type=int, default=100)
     parser.add_argument(
         "--max_train_steps",
         type=int,
-        default=700000,
+        default=None,
         help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
@@ -462,7 +455,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--validation_steps",
         type=int,
-        default=100,
+        default=500,
         help="Run validation every X steps.",
     )
     parser.add_argument(
@@ -593,6 +586,11 @@ def train() -> None:
         num_noise_buckets=args.num_noise_buckets,
         action_dim=train_dataset.action_dim,
     )
+
+    # Freeze vae and make unet and action_embedding trainable
+    vae.requires_grad_(False)
+    unet.train()
+    action_embedding.train()
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -843,7 +841,7 @@ def train() -> None:
     for epoch in range(first_epoch, args.num_train_epochs):
         train_loss = 0.0
         for _, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(unet, action_embedding):
                 # Convert gameplay frames to latent space
                 pixel_values = batch["pixel_values"].to(weight_dtype)
                 pixel_values = rearrange(pixel_values, "b l c h w -> (b l) c h w")
@@ -957,6 +955,9 @@ def train() -> None:
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(unet.parameters(), args.max_grad_norm)
+                    accelerator.clip_grad_norm_(
+                        action_embedding.parameters(), args.max_grad_norm
+                    )
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
@@ -978,6 +979,7 @@ def train() -> None:
                             validation_batch,
                             vae,
                             unet,
+                            noise_scheduler,
                             action_embedding,
                             args,
                             accelerator,

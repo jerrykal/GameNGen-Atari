@@ -113,11 +113,6 @@ def get_models(
                 num_noise_buckets, unet.time_embedding.linear_2.out_features
             )
 
-    # Freeze vae and make unet and action_embedding trainable
-    vae.requires_grad_(False)
-    unet.train()
-    action_embedding.train()
-
     return unet, vae, noise_scheduler, action_embedding
 
 
