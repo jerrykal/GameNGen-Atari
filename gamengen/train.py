@@ -90,11 +90,6 @@ def log_validation(
     if args.enable_xformers_memory_efficient_attention:
         pipeline.enable_xformers_memory_efficient_attention()
 
-    if args.seed is None:
-        generator = None
-    else:
-        generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
-
     generated_images = []
     target_images = []
     for i in range(batch["pixel_values"].shape[0]):
@@ -110,6 +105,14 @@ def log_validation(
             past_actions = (
                 batch["input_ids"][i][:-1, ...].unsqueeze(0).to(accelerator.device)
             )
+
+            if args.seed is None:
+                generator = None
+            else:
+                generator = torch.Generator(device=accelerator.device).manual_seed(
+                    args.seed
+                )
+
             generated_image = pipeline(
                 past_frames,
                 past_actions,
@@ -321,6 +324,34 @@ def parse_args():
         help=(
             "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
         ),
+    )
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        default="adafactor",
+        choices=["adamW", "adafactor"],
+        help="The optimizer to use.",
+    )
+    parser.add_argument(
+        "--adam_beta1",
+        type=float,
+        default=0.9,
+        help="The beta1 parameter for the Adam optimizer.",
+    )
+    parser.add_argument(
+        "--adam_beta2",
+        type=float,
+        default=0.999,
+        help="The beta2 parameter for the Adam optimizer.",
+    )
+    parser.add_argument(
+        "--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use."
+    )
+    parser.add_argument(
+        "--adam_epsilon",
+        type=float,
+        default=1e-08,
+        help="Epsilon value for the Adam optimizer",
     )
     parser.add_argument(
         "--adafactor_beta2_decay",
@@ -637,14 +668,25 @@ def main():
         )
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adafactor(
-        list(unet.parameters()) + list(action_embedding.parameters()),
-        lr=args.learning_rate,
-        weight_decay=args.adafactor_weight_decay,
-        beta2_decay=args.adafactor_beta2_decay,
-        eps=(args.adafactor_eps1, args.adafactor_eps2),
-        d=args.adafactor_d,
-    )
+    if args.optimizer == "adafactor":
+        optimizer = torch.optim.Adafactor(
+            list(unet.parameters()) + list(action_embedding.parameters()),
+            lr=args.learning_rate,
+            weight_decay=args.adafactor_weight_decay,
+            beta2_decay=args.adafactor_beta2_decay,
+            eps=(args.adafactor_eps1, args.adafactor_eps2),
+            d=args.adafactor_d,
+        )
+    elif args.optimizer == "adamW":
+        optimizer = torch.optim.AdamW(
+            list(unet.parameters()) + list(action_embedding.parameters()),
+            lr=args.learning_rate,
+            betas=(args.adam_beta1, args.adam_beta2),
+            weight_decay=args.adam_weight_decay,
+            eps=args.adam_epsilon,
+        )
+    else:
+        raise ValueError(f"Unknown optimizer: {args.optimizer}")
 
     def collate_fn(examples):
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
