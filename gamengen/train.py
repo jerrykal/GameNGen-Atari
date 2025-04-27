@@ -455,7 +455,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--validation_steps",
         type=int,
-        default=500,
+        default=100,
         help="Run validation every X steps.",
     )
     parser.add_argument(
