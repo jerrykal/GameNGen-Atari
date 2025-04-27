@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 dataset_path=${DATASET_PATH:-"data/gamengen/pong"}
-dataset_name=${DATASET_NAME:-$(basename "$dataset_path")}
+output_name=$(basename "$dataset_path")
 
 seed=${SEED:-42}
 max_train_steps=${MAX_TRAIN_STEPS:-700000}
@@ -14,12 +14,12 @@ gradient_accumulation_steps=$((total_batch_size / batch_size_per_device))
 checkpoints_total_limit=${CHECKPOINTS_TOTAL_LIMIT:-2}
 checkpointing_steps=${CHECKPOINTING_STEPS:-100}
 
-name_suffix="cl${context_length}_bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d_%H%M)"
-output_dir=${OUTPUT_DIR:-"saves/gamengen/${dataset_name}_${name_suffix}"}
+output_suffix="cl${context_length}_bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
+output_dir=${OUTPUT_DIR:-"saves/gamengen/${output_name}_${output_suffix}"}
 
 args=(
     --output_dir="$output_dir"
-    --dataset_name="$dataset_name"
+    --dataset_name="$dataset_path"
     --seed="$seed"
     --num_noise_buckets=0
     --context_length="$context_length"

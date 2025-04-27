@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 dataset_path=${DATASET_PATH:-"data/gamengen/pong"}
-dataset_name=${DATASET_NAME:-$(basename "$dataset_path")}
+output_name=$(basename "$dataset_path")
 
 seed=${SEED:-42}
 max_train_steps=${MAX_TRAIN_STEPS:-10000}
@@ -13,8 +13,8 @@ gradient_accumulation_steps=$((total_batch_size / batch_size_per_device))
 checkpoints_total_limit=${CHECKPOINTS_TOTAL_LIMIT:-2}
 checkpointing_steps=${CHECKPOINTING_STEPS:-1000}
 
-name_suffix="bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d_%H%M)"
-output_dir=${OUTPUT_DIR:-"saves/latent_decoder/${dataset_name}_${name_suffix}"}
+output_suffix="bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
+output_dir=${OUTPUT_DIR:-"saves/latent_decoder/${output_name}_${output_suffix}"}
 
 args=(
     --output_dir="$output_dir"
@@ -30,6 +30,4 @@ args=(
     "$@"
 )
 
-# NOTE: Temporary set num_noise_buckets to 0 to avoid noise augmentation
-# python -m gamengen.train "${args[@]}"
 accelerate launch --mixed_precision="bf16" -m gamengen.finetune_latent_decoder "${args[@]}"
