@@ -877,13 +877,38 @@ def train() -> None:
                     latents[:, -1:], noise, timesteps
                 )
 
+                # Augment the context frames with varying noise to simulate autoregressive drift
+                # See section 3.2.1 of the GameNGen paper
+                noise_level = (
+                    torch.rand(bsz, device=latents.device) * args.max_noise_level
+                )
+                context_noise = (
+                    torch.randn_like(latents[:, : args.context_length])
+                    * noise_level[:, None, None, None, None]
+                )
+                noisy_latents[:, : args.context_length] = (
+                    latents[:, : args.context_length] + context_noise
+                )
+
+                # Discretize the noise level
+                class_labels = (
+                    torch.bucketize(
+                        noise_level,
+                        torch.linspace(
+                            0,
+                            args.max_noise_level,
+                            args.num_noise_buckets + 1,
+                            device=latents.device,
+                        ),
+                    )
+                    - 1
+                )
+
                 # Reshape the noisy_latents so that context_frames are concatenated at the latent channels
                 noisy_latents = rearrange(noisy_latents, "b l c h w -> b (l c) h w")
 
                 # Get the action embedding for conditioning
                 encoder_hidden_states = action_embedding(batch["input_ids"])
-
-                # TODO: Implement noise augmentation
 
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
@@ -918,7 +943,11 @@ def train() -> None:
 
                 # Predict the noise residual and compute loss
                 model_pred = unet(
-                    noisy_latents, timesteps, encoder_hidden_states, return_dict=False
+                    noisy_latents,
+                    timesteps,
+                    encoder_hidden_states,
+                    class_labels,
+                    return_dict=False,
                 )[0]
 
                 if args.snr_gamma is None:
