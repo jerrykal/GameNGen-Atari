@@ -50,7 +50,7 @@ class GameplayDataset(Dataset):
                 split=split,
                 **load_dataset_kwargs,
             )
-        self.dataset = self.dataset.select_columns(["frame", "action"])
+        self.dataset = self.dataset.select_columns(["frame", "action", "step_id"])
         self._action_dim = max(self.dataset["action"]) + 1
 
         # NOTE: The images are resized to 256x256, which differs from the original paper.
@@ -78,19 +78,45 @@ class GameplayDataset(Dataset):
             ]
         )
         actions = torch.tensor(example["action"])
-        return {"pixel_values": frames, "input_ids": actions}
+        return {
+            "pixel_values": frames,
+            "input_ids": actions,
+            # step_id is used to determine the beginning of an episode during __getitem__.
+            "step_id": example["step_id"],
+        }
 
     def __len__(self) -> int:
         return len(self.dataset)
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
-        if idx < self.context_length:
-            # Pad the beginning of the sequence with the first example until the context length is reached
-            return {
-                key: torch.cat(
-                    [self.dataset[:1][key]] * (self.context_length - idx)
-                    + [self.dataset[: idx + 1][key]]
-                )
-                for key in self.dataset[0].keys()
-            }
-        return self.dataset[idx - self.context_length : idx + 1]
+        step_id = self.dataset[idx]["step_id"]
+        start_idx = idx - (
+            self.context_length if step_id > self.context_length else step_id
+        )
+
+        pixel_values = self.dataset[start_idx : idx + 1]["pixel_values"]
+        input_ids = self.dataset[start_idx : idx + 1]["input_ids"]
+
+        # Insert padding when step_id is smaller than the context length.
+        # This occurs at the start of an episode when the frame count is below the context length.
+        if step_id < self.context_length:
+            pad_len = self.context_length - step_id
+            pad_pixel_values = torch.zeros(
+                pad_len,
+                *pixel_values.shape[1:],
+                dtype=pixel_values.dtype,
+                device=pixel_values.device,
+            )
+
+            # NOTE: input_ids are padded with zeros, which are considered as the default value for NOOP
+            pad_input_ids = torch.zeros(
+                pad_len, dtype=input_ids.dtype, device=input_ids.device
+            )
+
+            pixel_values = torch.cat([pad_pixel_values, pixel_values], dim=0)
+            input_ids = torch.cat([pad_input_ids, input_ids], dim=0)
+
+        return {
+            "pixel_values": pixel_values,
+            "input_ids": input_ids,
+        }
