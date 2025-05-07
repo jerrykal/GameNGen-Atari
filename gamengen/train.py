@@ -101,10 +101,10 @@ def log_validation(
             autocast_ctx = torch.autocast(accelerator.device.type)
 
         with autocast_ctx:
-            past_frames = (
+            context_images = (
                 batch["pixel_values"][i][:-1, ...].unsqueeze(0).to(accelerator.device)
             )
-            past_actions = (
+            context_actions = (
                 batch["input_ids"][i][:-1, ...].unsqueeze(0).to(accelerator.device)
             )
 
@@ -116,8 +116,8 @@ def log_validation(
                 )
 
             generated_image = pipeline(
-                past_frames,
-                past_actions,
+                context_images=context_images,
+                context_actions=context_actions,
                 num_inference_steps=args.validation_num_inference_steps,
                 generator=generator,
             ).images[0]
@@ -492,6 +492,15 @@ def parse_args() -> argparse.Namespace:
             "The number buckets to discretize the noise augmentation. An embedding is learned for each bucket "
             "and the embedding is used to condition the noise augmentation. For more details see section 3.2.1 of "
             "the GameNGen paper."
+        ),
+    )
+    parser.add_argument(
+        "--max_noise_level",
+        type=float,
+        default=0.7,
+        help=(
+            "The maximum noise level to use for the noise augmentation. "
+            "For more details see section 3.2.1 of the GameNGen paper."
         ),
     )
     parser.add_argument(
