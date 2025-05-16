@@ -16,7 +16,10 @@ validation_steps=${VALIDATION_STEPS:-1000}
 checkpoints_total_limit=${CHECKPOINTS_TOTAL_LIMIT:-2}
 checkpointing_steps=${CHECKPOINTING_STEPS:-1000}
 
-output_suffix="cl${context_length}_nb${num_noise_buckets}_bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
+render_width=${WIDTH:-256}
+render_height=${HEIGHT:-256}
+
+output_suffix="w${render_width}_h${render_height}_cl${context_length}_nb${num_noise_buckets}_bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
 output_dir=${OUTPUT_DIR:-"saves/gamengen/${output_name}_${output_suffix}"}
 
 args=(
@@ -33,6 +36,8 @@ args=(
     --checkpoints_total_limit="$checkpoints_total_limit"
     --checkpointing_steps="$checkpointing_steps"
     --resume_from_checkpoint="latest"
+    --render_width="$render_width"
+    --render_height="$render_height"
     "$@"
 )
 

@@ -29,6 +29,8 @@ class GameplayDataset(Dataset):
         data_files: str | None = None,
         split: str | Split = "train",
         context_length: int = 16,
+        width: int = 256,
+        height: int = 256,
         **load_dataset_kwargs,
     ) -> None:
         self.context_length = context_length
@@ -58,7 +60,7 @@ class GameplayDataset(Dataset):
         self._frame_transform = transforms.Compose(
             [
                 transforms.Resize(
-                    (256, 256), interpolation=transforms.InterpolationMode.BICUBIC
+                    (width, height), interpolation=transforms.InterpolationMode.BICUBIC
                 ),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),

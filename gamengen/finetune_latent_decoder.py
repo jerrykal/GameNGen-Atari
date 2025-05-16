@@ -379,6 +379,18 @@ def parse_args() -> argparse.Namespace:
         default=10,
         help="Number of inference steps to use for validation.",
     )
+    parser.add_argument(
+        "--render_width",
+        type=int,
+        default=256,
+        help="Width of the rendered images.",
+    )
+    parser.add_argument(
+        "--render_height",
+        type=int,
+        default=256,
+        help="Height of the rendered images.",
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -454,9 +466,8 @@ def train() -> None:
         variant=args.variant,
     )
 
-    # Freeze all parameters except the decoder
-    vae.requires_grad_(False)
-    vae.decoder.requires_grad_(True)
+    # Freeze the encoder
+    vae.encoder.requires_grad_(False)
 
     # Create image processor
     vae_scale_factor = 2 ** (len(vae.config.block_out_channels) - 1)
@@ -685,9 +696,7 @@ def train() -> None:
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(
-                        vae.decoder.parameters(), args.max_grad_norm
-                    )
+                    accelerator.clip_grad_norm_(vae.parameters(), args.max_grad_norm)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()

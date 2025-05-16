@@ -12,8 +12,10 @@ batch_size_per_device=${BATCH_SIZE_PER_DEVICE:-16}
 gradient_accumulation_steps=$((total_batch_size / batch_size_per_device))
 checkpoints_total_limit=${CHECKPOINTS_TOTAL_LIMIT:-2}
 checkpointing_steps=${CHECKPOINTING_STEPS:-1000}
+render_width=${WIDTH:-256}
+render_height=${HEIGHT:-256}
 
-output_suffix="bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
+output_suffix="w${render_width}_h${render_height}_bsz${total_batch_size}_st${max_train_steps}_$(date +%Y%m%d%H%M)"
 output_dir=${OUTPUT_DIR:-"saves/latent_decoder/${output_name}_${output_suffix}"}
 
 args=(
@@ -27,6 +29,8 @@ args=(
     --checkpoints_total_limit="$checkpoints_total_limit"
     --checkpointing_steps="$checkpointing_steps"
     --resume_from_checkpoint="latest"
+    --render_width="$render_width"
+    --render_height="$render_height"
     "$@"
 )
 

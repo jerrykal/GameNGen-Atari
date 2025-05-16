@@ -518,6 +518,18 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Path to the fine-tuned VAE checkpoint, for more details see section 3.2.2 of the GameNGen paper.",
     )
+    parser.add_argument(
+        "--render_width",
+        type=int,
+        default=256,
+        help="The width of the rendered images.",
+    )
+    parser.add_argument(
+        "--render_height",
+        type=int,
+        default=256,
+        help="The height of the rendered images.",
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -583,6 +595,8 @@ def train() -> None:
         data_dir=args.train_data_dir,
         split="train",
         context_length=args.context_length,
+        width=args.render_width,
+        height=args.render_height,
     )
 
     # Load models
