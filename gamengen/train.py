@@ -478,7 +478,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--context_length",
         type=int,
-        default=16,
+        default=4,
         help=(
             "The number of past observation and actions to use for conditioning, "
             "for more details see section 5.2.1 of the GameNGen paper."
